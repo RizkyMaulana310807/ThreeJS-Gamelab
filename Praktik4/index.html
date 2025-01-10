@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Geometry</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+  </head>
+  <body>
+    <center>
+      <div id="Scene"></div>
+    </center>
+
+    <!-- <script type="module" src="box.js"></script> -->
+    <!-- <script type="module" src="sphere.js"></script> -->
+    <!-- <script type="module" src="cylinder.js"></script> -->
+    <!-- <script type="module" src="plane.js"></script> -->
+    <!-- <script type="module" src="torus.js"></script> -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./node_modules/three/build/three.module.js"
+        }
+      }
+    </script>
+    <script type="module" src="box.js"></script>
+  </body>
+</html>
