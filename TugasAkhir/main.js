@@ -1,621 +1,504 @@
 import * as THREE from "three";
 import { GLTFLoader } from "GLTFLoader";
+import { EffectComposer } from "EffectComposer";
+import { RenderPass } from "RenderPass";
+import { UnrealBloomPass } from "UnrealBloomPass";
 
 // Game state
-let score = 0;
-let velocity = { x: 0, z: 0.1 };
-let rotation = { x: 0, y: 0 };
-let mouse = { x: 0, y: 0, isDown: false };
-let objectRotation = { x: 0, y: 0 };
-let isCamera1 = true;
-let isTransitioning = false;
+const gameState = {
+  score: 0,
+  isGameOver: false,
+  isLoading: true,
+  isPlaying: false,
+  loadedModels: {
+    player: false,
+    ufo: false,
+  },
+};
+let cameraHeight = 10; // Ketinggian awal kamera
+const cameraSpeed = 0.5; // Kecepatan naik/turun
 
+document.addEventListener("keydown", (event) => {
+  if (event.key === "ArrowUp") {
+    cameraHeight += cameraSpeed; // Naikkan kamera
+  } else if (event.key === "ArrowDown") {
+    cameraHeight -= cameraSpeed; // Turunkan kamera
+  }
+});
+
+
+// Setup scene
 const scene = new THREE.Scene();
-const clock = new THREE.Clock();
-
-
-// Create Game Over overlay
-const gameOverDiv = document.createElement("div");
-gameOverDiv.style.position = "fixed";
-gameOverDiv.style.top = "0";
-gameOverDiv.style.left = "0";
-gameOverDiv.style.width = "100%";
-gameOverDiv.style.height = "100%";
-gameOverDiv.style.backgroundColor = "black";
-gameOverDiv.style.display = "flex";
-gameOverDiv.style.flexDirection = "column";
-gameOverDiv.style.justifyContent = "center";
-gameOverDiv.style.alignItems = "center";
-gameOverDiv.style.opacity = "0"; // Start invisible
-gameOverDiv.style.transition = "opacity 1s ease-in-out";
-gameOverDiv.style.pointerEvents = "none"; // Disable interactions initially
-document.body.appendChild(gameOverDiv);
-
-const gameOverText = document.createElement("div");
-gameOverText.textContent = "Game Over";
-gameOverText.style.color = "white";
-gameOverText.style.fontSize = "48px";
-gameOverText.style.marginBottom = "20px";
-gameOverText.style.opacity = "0"; // Fade-in effect
-gameOverText.style.transition = "opacity 1s ease-in-out";
-gameOverDiv.appendChild(gameOverText);
-
-const restartText = document.createElement("div");
-restartText.textContent = "Press Space to Restart";
-restartText.style.color = "white";
-restartText.style.fontSize = "24px";
-restartText.style.opacity = "0"; // Fade-in effect
-restartText.style.transition = "opacity 1s ease-in-out";
-gameOverDiv.appendChild(restartText);
-
-
-// Camera setup
-const camera1 = new THREE.PerspectiveCamera(
+const camera = new THREE.PerspectiveCamera(
   75,
   window.innerWidth / window.innerHeight,
   0.1,
   1000
 );
-const camera2 = new THREE.PerspectiveCamera(
-  75,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  1000
-);
-let activeCamera = camera1;
-
-const renderer = new THREE.WebGLRenderer();
+const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// Plane setup
-const planeGeometry = new THREE.PlaneGeometry(1000, 1000, 50, 50);
-const planeMaterial = new THREE.MeshStandardMaterial({
-  color: 0xffffff,
-  wireframe: false,
-});
+// Post-processing setup
+const composer = new EffectComposer(renderer);
+const renderPass = new RenderPass(scene, camera);
+composer.addPass(renderPass);
+
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  1.5,
+  0.4,
+  0.85
+);
+composer.addPass(bloomPass);
+
+// Controls
+const controls = {
+  velocity: { x: 0, z: 0 },
+  rotation: { x: 0, y: 0 },
+  mouse: { x: 0, y: 0, isDown: false },
+};
+
+function checkAllModelsLoaded() {
+  return gameState.loadedModels.player && gameState.loadedModels.ufo;
+}
+
+function updateLoadingScreen() {
+  if (checkAllModelsLoaded()) {
+    gameState.isLoading = false;
+    loadingScreen.style.display = "none";
+    // Start spawning UFOs immediately after models are loaded
+    // Jalankan loop untuk spawn UFO setiap 3 detik
+    setInterval(() => {
+      if (!gameState.isGameOver) {
+        spawnUfo();
+      }
+    }, 500);
+  }
+}
+
+// Create loading screen
+const loadingScreen = document.createElement("div");
+loadingScreen.style.position = "absolute";
+loadingScreen.style.width = "100%";
+loadingScreen.style.height = "100%";
+loadingScreen.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
+loadingScreen.style.color = "white";
+loadingScreen.style.display = "flex";
+loadingScreen.style.justifyContent = "center";
+loadingScreen.style.alignItems = "center";
+loadingScreen.style.fontSize = "2em";
+loadingScreen.innerHTML = "Loading Models...";
+document.body.appendChild(loadingScreen);
+
+// Create score display
+const scoreDisplay = document.createElement("div");
+scoreDisplay.style.position = "absolute";
+scoreDisplay.style.top = "20px";
+scoreDisplay.style.left = "20px";
+scoreDisplay.style.color = "white";
+scoreDisplay.style.fontSize = "24px";
+document.body.appendChild(scoreDisplay);
+
+// Create game over screen
+const gameOverScreen = document.createElement("div");
+gameOverScreen.style.position = "absolute";
+gameOverScreen.style.width = "100%";
+gameOverScreen.style.height = "100%";
+gameOverScreen.style.backgroundColor = "rgba(0, 0, 0, 1)";
+gameOverScreen.style.flexDirection = "column";
+gameOverScreen.style.color = "white";
+gameOverScreen.style.display = "flex";
+gameOverScreen.style.justifyContent = "center";
+gameOverScreen.style.alignItems = "center";
+gameOverScreen.style.fontSize = "3em";
+gameOverScreen.innerHTML = `<div style="color: white;">GAME OVER</div><div style="font-size: 0.5em; margin-top: 20px;">Press SPACE to Restart</div>`;
+document.body.appendChild(gameOverScreen);
+
+// Setup plane
+const planeGeometry = new THREE.PlaneGeometry(1000, 1000);
+const planeMaterial = new THREE.MeshStandardMaterial({ color: 0x111111 });
 const plane = new THREE.Mesh(planeGeometry, planeMaterial);
 plane.rotation.x = -Math.PI / 2;
 scene.add(plane);
 
-// Lighting setup
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+// Lighting
+const ambientLight = new THREE.AmbientLight(0x333333, 1);
 scene.add(ambientLight);
-const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+
+const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
 directionalLight.position.set(10, 20, 10);
 scene.add(directionalLight);
 
-// Aim circle setup
-const aimGroup = new THREE.Group();
-const smallCircleGeometry = new THREE.RingGeometry(0.2, 0.3, 32);
-const largeCircleGeometry = new THREE.RingGeometry(0.4, 0.5, 32);
-const circleMaterial = new THREE.MeshBasicMaterial({
-  color: 0xff0000,
-  transparent: true,
-  opacity: 0.5,
-  side: THREE.DoubleSide,
-});
-const smallCircle = new THREE.Mesh(smallCircleGeometry, circleMaterial);
-const largeCircle = new THREE.Mesh(largeCircleGeometry, circleMaterial);
-smallCircle.position.z = -3;
-largeCircle.position.z = -4;
-aimGroup.add(smallCircle);
-aimGroup.add(largeCircle);
-scene.add(aimGroup);
+let playerLight = new THREE.PointLight(0xffffff, 2, 20);
+scene.add(playerLight);
 
-// Bullet system
-const bulletGeometry = new THREE.SphereGeometry(0.1);
-const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-const bullets = [];
-let canShoot = true;
-const shootCooldown = 500;
+// Create star particles
+const starGeometry = new THREE.BufferGeometry();
+const starCount = 1000;
+const starPositions = new Float32Array(starCount * 3);
+const starSizes = new Float32Array(starCount);
 
-// Particle system
-const particleCount = 30;
-const particleGeometry = new THREE.BufferGeometry();
-const particleMaterial = new THREE.PointsMaterial({
+for (let i = 0; i < starCount; i++) {
+  const i3 = i * 3;
+  starPositions[i3] = (Math.random() - 0.5) * 2000;
+  starPositions[i3 + 1] = Math.random() * 1000;
+  starPositions[i3 + 2] = (Math.random() - 0.5) * 2000;
+  starSizes[i] = Math.random();
+}
+
+starGeometry.setAttribute(
+  "position",
+  new THREE.BufferAttribute(starPositions, 3)
+);
+starGeometry.setAttribute("size", new THREE.BufferAttribute(starSizes, 1));
+
+const starMaterial = new THREE.PointsMaterial({
   color: 0xffffff,
-  size: 0.05,
+  size: 2,
   transparent: true,
   blending: THREE.AdditiveBlending,
 });
 
-const particleSystems = [];
-for (let i = 0; i < 10; i++) {
-  const positions = new Float32Array(particleCount * 3);
-  const velocities = [];
-  for (let j = 0; j < particleCount; j++) {
-    velocities.push({
-      x: (Math.random() - 0.5) * 0.3,
-      y: (Math.random() - 0.5) * 0.3,
-      z: (Math.random() - 0.5) * 0.3,
-    });
-  }
-  particleGeometry.setAttribute(
-    "position",
-    new THREE.BufferAttribute(positions, 3)
-  );
-  const particleSystem = {
-    points: new THREE.Points(
-      particleGeometry.clone(),
-      particleMaterial.clone()
-    ),
-    velocities: velocities,
-    active: false,
-    life: 0,
-  };
-  particleSystems.push(particleSystem);
-  scene.add(particleSystem.points);
-}
+const stars = new THREE.Points(starGeometry, starMaterial);
+scene.add(stars);
 
-// Load 3D object
-const loader = new GLTFLoader();
-let object3D;
-loader.load("PesawatBabe.glb", (gltf) => {
-  object3D = gltf.scene;
-  object3D.scale.set(1, 1, 1);
-  scene.add(object3D);
-});
+// Projectile management
+const bullets = [];
+const bulletGeometry = new THREE.SphereGeometry(0.2);
+const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
 
-const targetCubes = [];
-function createTargetCubes() {
-  const directions = ["center", "left", "right"];
-  for (let i = 0; i < 5; i++) {
-    const cube = createSingleCube(directions[i]);
-    targetCubes.push(cube);
-    scene.add(cube);
-  }
-}
-
-function showGameOver() {
-  gameOverDiv.style.opacity = "1";
-  gameOverDiv.style.pointerEvents = "auto"; // Enable interactions
-  setTimeout(() => {
-    gameOverText.style.opacity = "1"; // Fade in Game Over text
-    restartText.style.opacity = "1"; // Fade in Restart text
-  }, 1000); // Delay to sync with background fade-in
-
-  // Freeze game by stopping updates
-  cancelAnimationFrame(animationId); // Stop the animation loop
-}
-
-
-document.addEventListener("keydown", (event) => {
-  if (event.key === " " && gameOverDiv.style.opacity === "1") {
-    restartGame();
-  }
-});
-
-function restartGame() {
-  // Reset game state
-  score = 0;
-  scoreDiv.textContent = `Score: ${score}`;
-  targetCubes.forEach((cube) => scene.remove(cube));
-  targetCubes.length = 0;
-  createTargetCubes(); // Reinitialize cubes
-  bullets.forEach((bullet) => scene.remove(bullet));
-  bullets.length = 0;
-
-  object3D.position.set(0, 0, 0); // Reset object position
-  velocity = { x: 0, z: 0.1 };
-  rotation = { x: 0, y: 0 };
-  objectRotation = { x: 0, y: 0 };
-
-  // Hide Game Over screen
-  gameOverDiv.style.opacity = "0";
-  gameOverDiv.style.pointerEvents = "none";
-  gameOverText.style.opacity = "0";
-  restartText.style.opacity = "0";
-
-  // Restart animation loop
-  animate();
-}
-
-
-// Create a single cube
-function createSingleCube(direction) {
-  const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
-  const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
-  const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-
-  const distance = 20; // Jarak spawn dari kamera
-  const angle = Math.random() * Math.PI * 2; // Acak arah spawn
-  cube.position.x = Math.sin(angle) * distance + activeCamera.position.x;
-  cube.position.z = Math.cos(angle) * distance + activeCamera.position.z;
-  cube.position.y = 1 + Math.random() * 1; // Variasi ketinggian
-
-  // Kecepatan mendekat ke pemain
-  cube.velocity = new THREE.Vector3(0, 0, 0); // Akan dihitung setiap frame
-
-  return cube;
-}
-
-createTargetCubes();
-
-const hitSound = new Audio("hit.mp3"); // Pastikan jalurnya benar
-const gameOverSound = () => {
-  const gameOver = new Audio('gameover.mp3');
-  gameOver.currentTime = 0;
-  gameOver.play();
-}
-
-function playHitSound() {
-  // Pastikan suara diputar ulang setiap kali dipanggil
-  hitSound.currentTime = 0; // Reset ke awal
-  hitSound.play();
-}
-
-function playPunchSound() {
-  let punchSound = new Audio("punch.mp3"); // Pastikan jalurnya benar
-  punchSound.currentTime = 0;
-  punchSound.play();
-}
-
-function updateCubes() {
-  if (!object3D) return;
-
-  targetCubes.forEach((cube, index) => {
-    // Hitung arah menuju pemain
-    const direction = new THREE.Vector3();
-    direction.subVectors(object3D.position, cube.position).normalize();
-
-    // Perbarui posisi kubus berdasarkan arah
-    const speed = 0.05; // Kecepatan tetap
-    cube.velocity = direction.multiplyScalar(speed);
-    cube.position.add(cube.velocity);
-
-    // Periksa tabrakan dengan peluru
-    bullets.forEach((bullet, bulletIndex) => {
-      if (bullet.position.distanceTo(cube.position) < 1) {
-        createBulletImpact(cube.position);
-        scene.remove(cube);
-        scene.remove(bullet);
-        targetCubes.splice(index, 1);
-        bullets.splice(bulletIndex, 1);
-
-        // Spawn kubus baru setelah dihancurkan
-        const newCube = createSingleCube();
-        targetCubes.push(newCube);
-        scene.add(newCube);
-
-        score += 10;
-        scoreDiv.textContent = `Score: ${score}`;
-      }
-    });
-
-    // Periksa tabrakan dengan pemain
-    if (cube.position.distanceTo(object3D.position) < 1) {
-      score = 0;
-      gameOverSound();
-      showGameOver();
-      return;
-      // scoreDiv.textContent = `Score: ${score}`;
-      // scene.remove(cube);
-      // targetCubes.splice(index, 1);
-
-      // // Spawn kubus baru
-      // const newCube = createSingleCube();
-      // targetCubes.push(newCube);
-      // scene.add(newCube);
-    }
-
-    // Jika kubus terlalu jauh, reset ke posisi awal
-    const maxDistance = 50;
-    if (cube.position.distanceTo(object3D.position) > maxDistance) {
-      scene.remove(cube);
-      targetCubes.splice(index, 1);
-
-      // Buat kubus baru
-      const newCube = createSingleCube();
-      targetCubes.push(newCube);
-      scene.add(newCube);
-    }
-  });
-}
-
-// UI setup
-const scoreDiv = document.createElement("div");
-scoreDiv.style.position = "absolute";
-scoreDiv.style.top = "10px";
-scoreDiv.style.left = "50%";
-scoreDiv.style.transform = "translateX(-50%)";
-scoreDiv.style.color = "white";
-scoreDiv.style.fontSize = "24px";
-scoreDiv.style.fontFamily = "Arial, sans-serif";
-scoreDiv.textContent = "Score: 0";
-document.body.appendChild(scoreDiv);
-
-function createFloatingText(text, position) {
-  const floatingText = document.createElement("div");
-  floatingText.textContent = text;
-  floatingText.style.position = "absolute";
-  floatingText.style.color = "yellow";
-  floatingText.style.fontSize = "20px";
-  floatingText.style.fontWeight = "bold";
-  floatingText.style.pointerEvents = "none";
-  floatingText.style.transition = "transform 1s ease-out, opacity 1s ease-out";
-  floatingText.style.opacity = "1";
-  document.body.appendChild(floatingText);
-
-  // Hitung posisi layar dari posisi 3D
-  const vector = new THREE.Vector3(position.x, position.y, position.z);
-  vector.project(activeCamera);
-
-  const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
-  const y = (-vector.y * 0.5 + 0.5) * window.innerHeight;
-
-  floatingText.style.left = `${x}px`;
-  floatingText.style.top = `${y}px`;
-
-  // Animasikan melayang ke atas
-  setTimeout(() => {
-    floatingText.style.transform = "translateY(-50px)";
-    floatingText.style.opacity = "0";
-  }, 0);
-
-  // Hapus elemen setelah animasi selesai
-  setTimeout(() => {
-    document.body.removeChild(floatingText);
-  }, 1000);
-}
-
-// Helper functions
-function createBulletImpact(position) {
-  const particleSystem = particleSystems.find((ps) => !ps.active);
-  if (!particleSystem) return;
-
-  particleSystem.active = true;
-  particleSystem.life = 1.0;
-  particleSystem.points.position.copy(position);
-  particleSystem.points.visible = true;
-
-  const positions = particleSystem.points.geometry.attributes.position.array;
-  for (let i = 0; i < particleCount; i++) {
-    positions[i * 3] = 0;
-    positions[i * 3 + 1] = 0;
-    positions[i * 3 + 2] = 0;
-  }
-  particleSystem.points.geometry.attributes.position.needsUpdate = true;
-}
-
-function shootBullet() {
-  if (!canShoot || !object3D) return;
+function shoot() {
+  if (!playerModel || gameState.isGameOver) return;
 
   const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
-  playPunchSound();
-  // If in third-person view, shoot from the front of the plane
-  if (!isCamera1) {
-    const frontOffset = new THREE.Vector3(0, 0, 1);
-    frontOffset.applyQuaternion(object3D.quaternion);
-    bullet.position.copy(object3D.position).add(frontOffset);
+  bullet.position.copy(playerModel.position);
+  bullet.boundingBox = new THREE.Box3().setFromObject(bullet);
 
-    // Calculate direction based on aim circle
-    const direction = new THREE.Vector3();
-    direction.subVectors(aimGroup.position, bullet.position).normalize();
-    bullet.velocity = direction.multiplyScalar(0.5);
-  } else {
-    // First-person view shooting
-    const direction = new THREE.Vector3();
-    activeCamera.getWorldDirection(direction);
+  const direction = new THREE.Vector3(0, 0, -1);
+  direction.applyQuaternion(playerModel.quaternion);
+  bullet.velocity = direction.multiplyScalar(-1);
 
-    // Spawn bullet from camera position
-    bullet.position.copy(activeCamera.position);
-    bullet.velocity = direction.multiplyScalar(0.5); // Bullet speed
-  }
-
-  bullet.distanceTraveled = 0;
+  const shootSfx = new Audio("shoot.mp3");
+  shootSfx.volume = 0.2;
+  shootSfx.play();
   bullets.push(bullet);
   scene.add(bullet);
-  canShoot = false;
-  setTimeout(() => {
-    canShoot = true;
-  }, shootCooldown);
 }
 
-function checkBulletCollision(bullet) {
-  targetCubes.forEach((cube, index) => {
-    if (bullet.position.distanceTo(cube.position) < 1) {
-      createBulletImpact(cube.position);
-      playHitSound();
-      scene.remove(cube);
-      targetCubes.splice(index, 1);
+// Player model
+let playerModel;
+const loader = new GLTFLoader();
+loader.load(
+  "PesawatBabe.glb",
+  (gltf) => {
+    playerModel = gltf.scene;
+    playerModel.scale.set(1, 1, 1);
+    playerModel.rotation.y = Math.PI;
+    scene.add(playerModel);
 
-      createFloatingText("+10", cube.position);
+    gameState.loadedModels.player = true;
+    updateLoadingScreen();
+  },
+  undefined,
+  (error) => {
+    console.error("Error loading player model:", error);
+  }
+);
 
-      score += 10;
-      scoreDiv.textContent = `Score: ${score}`;
+function resetGame() {
+  gameState.score = 0;
+  gameState.isGameOver = false;
+  gameOverScreen.style.display = "none";
 
-      // Tambahkan kubus baru segera setelah satu hilang
-      if (targetCubes.length < 3) {
-        const newCube = createSingleCube();
-        scene.add(newCube);
-        targetCubes.push(newCube);
-      }
+  // Hapus semua UFO
+  for (let i = ufos.length - 1; i >= 0; i--) {
+    scene.remove(ufos[i]);
+  }
+  ufos.length = 0;
+
+  // Hapus semua peluru
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    scene.remove(bullets[i]);
+  }
+  bullets.length = 0;
+
+  // Reset posisi player
+  if (playerModel) {
+    playerModel.position.set(0, 0, 0);
+    controls.rotation.y = 0;
+    playerModel.rotation.y = Math.PI;
+  }
+
+  // Spawn UFO lagi setelah restart
+  setTimeout(() => spawnUfo(), 1000);
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === " ") {
+    if (gameState.isGameOver) {
+      resetGame();
+    } else {
+      shoot();
     }
+  }
+});
+
+// UFO management
+const ufos = [];
+const maxUfos = 6;
+let ufoPrototype = null;
+
+function createUfoPrototype() {
+  return new Promise((resolve) => {
+    loader.load(
+      "ufo.glb",
+      (gltf) => {
+        ufoPrototype = gltf.scene;
+        ufoPrototype.visible = false;
+        // Create a larger bounding box by expanding it by 4 units (previously was 2)
+        ufoPrototype.boundingBox = new THREE.Box3().setFromObject(ufoPrototype);
+        ufoPrototype.boundingBox.expandByScalar(4);
+        scene.add(ufoPrototype);
+
+        gameState.loadedModels.ufo = true;
+        updateLoadingScreen();
+        resolve();
+      },
+      undefined,
+      (error) => {
+        console.error("Error loading UFO model:", error);
+      }
+    );
   });
 }
 
-function toggleCamera() {
-  if (isTransitioning || !object3D) return;
+function createExplosion(position) {
+  const particleCount = 100;
+  const geometry = new THREE.BufferGeometry();
+  const positions = new Float32Array(particleCount * 3);
+  const velocities = [];
 
-  isTransitioning = true;
-  const startPosition = activeCamera.position.clone();
-  const startRotation = activeCamera.rotation.clone();
-  isCamera1 = !isCamera1;
+  for (let i = 0; i < particleCount; i++) {
+    const i3 = i * 3;
+    positions[i3] = position.x;
+    positions[i3 + 1] = position.y;
+    positions[i3 + 2] = position.z;
 
-  const endPosition = isCamera1
-    ? new THREE.Vector3(
-        object3D.position.x - Math.sin(rotation.y) * 5,
-        5, // Move camera up in first-person view
-        object3D.position.z - Math.cos(rotation.y) * 5
-      )
-    : new THREE.Vector3(
-        object3D.position.x,
-        object3D.position.y + 2, // Increase y for higher third-person view
-        object3D.position.z + 3
-      );
-  const endRotation = isCamera1
-    ? new THREE.Euler()
-    : new THREE.Euler(rotation.x, rotation.y, 0);
+    // Kecepatan acak untuk setiap partikel
+    velocities.push(
+      (Math.random() - 0.5) * 2, // X
+      (Math.random() - 0.5) * 2, // Y
+      (Math.random() - 0.5) * 2 // Z
+    );
+  }
 
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+
+  const material = new THREE.PointsMaterial({
+    color: 0xff6600,
+    size: 0.5,
+    transparent: true,
+    opacity: 1,
+    blending: THREE.AdditiveBlending,
+  });
+
+  const particles = new THREE.Points(geometry, material);
+  scene.add(particles);
+
+  // Animasikan partikel
+  const explosionDuration = 1.5;
   let elapsedTime = 0;
 
-  function transition() {
-    elapsedTime += clock.getDelta();
-    const progress = Math.min(elapsedTime / 1, 1);
+  function animateExplosion(deltaTime) {
+    elapsedTime += deltaTime;
 
-    activeCamera.position.lerpVectors(startPosition, endPosition, progress);
-    activeCamera.rotation.set(
-      THREE.MathUtils.lerp(startRotation.x, endRotation.x, progress),
-      THREE.MathUtils.lerp(startRotation.y, endRotation.y, progress),
-      THREE.MathUtils.lerp(startRotation.z, endRotation.z, progress)
-    );
+    if (elapsedTime > explosionDuration) {
+      scene.remove(particles);
+      return;
+    }
 
-    if (progress < 1) {
-      requestAnimationFrame(transition);
-    } else {
-      isTransitioning = false;
+    const positions = particles.geometry.attributes.position.array;
+    for (let i = 0; i < particleCount; i++) {
+      const i3 = i * 3;
+      positions[i3] += velocities[i3] * deltaTime * 10;
+      positions[i3 + 1] += velocities[i3 + 1] * deltaTime * 10;
+      positions[i3 + 2] += velocities[i3 + 2] * deltaTime * 10;
+    }
+
+    particles.geometry.attributes.position.needsUpdate = true;
+
+    requestAnimationFrame(() => animateExplosion(0.016));
+  }
+
+  animateExplosion(0.016);
+}
+
+// Collision detection
+function checkCollisions() {
+  // Bullet-UFO collisions
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const bullet = bullets[i];
+    for (let j = ufos.length - 1; j >= 0; j--) {
+      const ufo = ufos[j];
+      // Increased collision distance from 1 to 2 for easier hits
+      if (bullet.position.distanceTo(ufo.position) < 2) {
+        scene.remove(bullet);
+        bullets.splice(i, 1);
+
+        const explosionSfx = new Audio("expolosion.mp3");
+        explosionSfx.volume = 0.2;
+        explosionSfx.play();
+        createExplosion(ufo.position);
+        scene.remove(ufo);
+        ufos.splice(j, 1);
+
+        gameState.score += 10;
+        break;
+      }
     }
   }
 
-  transition();
+  // Player-UFO collisions
+  for (let i = ufos.length - 1; i >= 0; i--) {
+    const ufo = ufos[i];
+    // Keeping player collision distance at 2 for fair gameplay
+    if (playerModel.position.distanceTo(ufo.position) < 2) {
+      gameState.isGameOver = true;
+      window.location.href = "game-over.html";
+      localStorage.setItem("recentScore", gameState.score);
+    }
+  }
+}
+
+function cloneUfo() {
+  if (!ufoPrototype) return null;
+
+  const ufoClone = ufoPrototype.clone();
+  ufoClone.visible = true;
+  ufoClone.boundingBox = new THREE.Box3().setFromObject(ufoClone); // ✅ Initialize bounding box
+  return ufoClone;
+}
+
+function spawnUfo() {
+  if (!ufoPrototype || ufos.length >= maxUfos || gameState.isGameOver) return;
+
+  const ufo = ufoPrototype.clone();
+  ufo.visible = true;
+  ufo.boundingBox = new THREE.Box3().setFromObject(ufo);
+
+  // Area spawn lebih lebar saat skor > 1000
+  const spawnRange = gameState.score > 500 ? 50 : 30;
+
+  ufo.position.set(
+    playerModel.position.x + (Math.random() - 0.5) * spawnRange,
+    1,
+    playerModel.position.z - 50
+  );
+
+  // UFO mengejar pemain jika skor > 1000
+  ufo.updateVelocity = function () {
+    if (gameState.score > 1000) {
+      let direction = new THREE.Vector3().subVectors(playerModel.position, ufo.position);
+      direction.normalize();
+      ufo.velocity = direction.multiplyScalar(0.5);
+    } else {
+      ufo.velocity = new THREE.Vector3(0, 0, 0.3);
+    }
+  };
+
+  ufo.updateVelocity();
+  ufos.push(ufo);
+  scene.add(ufo);
 }
 
 // Event listeners
-document.addEventListener("mousedown", () => (mouse.isDown = true));
-document.addEventListener("mouseup", () => (mouse.isDown = false));
-document.addEventListener("keydown", (event) => {
-  if (event.key === " ") shootBullet(); // Change shooting to spacebar
-  if (event.key === "v" && !isTransitioning) toggleCamera();
-});
-
+document.addEventListener("mousedown", () => (controls.mouse.isDown = true));
+document.addEventListener("mouseup", () => (controls.mouse.isDown = false));
 document.addEventListener("mousemove", (event) => {
-  if (mouse.isDown) {
-    rotation.y -= event.movementX * 0.005;
-    rotation.x -= event.movementY * 0.005;
-    rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, rotation.x));
-
-    if (object3D) {
-      objectRotation.y -= event.movementX * 0.005;
-      objectRotation.x -= event.movementY * 0.005;
-      objectRotation.x = Math.max(
-        -Math.PI / 2,
-        Math.min(Math.PI / 2, objectRotation.x)
-      );
-    }
+  if (controls.mouse.isDown && playerModel && !gameState.isGameOver) {
+    controls.rotation.y -= event.movementX * 0.01;
+    playerModel.rotation.y = controls.rotation.y + Math.PI;
   }
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "w" || event.key === "ArrowUp") velocity.z = -0.1;
-  if (event.key === "s" || event.key === "ArrowDown") velocity.z = 0.1;
-  if (event.key === "a" || event.key === "ArrowLeft") velocity.x = -0.1;
-  if (event.key === "d" || event.key === "ArrowRight") velocity.x = 0.1;
+  if (gameState.isGameOver) return;
+
+  if (event.key === " ") shoot();
 });
 
-document.addEventListener("keyup", (event) => {
-  if (["w", "s", "ArrowUp", "ArrowDown"].includes(event.key)) velocity.z = 0;
-  if (["a", "d", "ArrowLeft", "ArrowRight"].includes(event.key)) velocity.x = 0;
-});
-
-let animationId;
-
+// Camera setup
+camera.position.set(0, 10, 1);
 
 // Animation loop
 function animate() {
-  animationId = requestAnimationFrame(animate);
+  requestAnimationFrame(animate);
 
-  if (object3D) {
-    updateCubes();
+  if (gameState.isLoading) return;
 
-    // Update object position and camera
-    // Update object position and camera
-    if (isCamera1) {
-      object3D.position.x += velocity.x;
-      object3D.position.z += velocity.z;
-      object3D.rotation.y = objectRotation.y;
-      object3D.rotation.x = objectRotation.x;
+  scoreDisplay.textContent = `Score: ${gameState.score}`;
 
-      activeCamera.position.set(
-        object3D.position.x - Math.sin(rotation.y) * 5,
-        5, // Increase the y value to move the camera up
-        object3D.position.z - Math.cos(rotation.y) * 5
-      );
-    } else {
-      const cameraOffset = new THREE.Vector3(0, 2, 3); // Move the camera higher in the third-person view
-      activeCamera.position.copy(object3D.position).add(cameraOffset);
-      object3D.rotation.y = rotation.y;
-      object3D.rotation.x = rotation.x;
-    }
+  // Pastikan kamera tetap pada ketinggian yang diperbarui
+  camera.position.set(playerModel.position.x, cameraHeight, playerModel.position.z + 25);
+  camera.lookAt(playerModel.position);
 
-    const lookAtPoint = new THREE.Vector3(
-      activeCamera.position.x + Math.sin(rotation.y),
-      activeCamera.position.y + Math.sin(rotation.x),
-      activeCamera.position.z + Math.cos(rotation.y)
-    );
-    activeCamera.lookAt(lookAtPoint);
+  if (playerModel && !gameState.isGameOver) {
+    playerModel.position.x += controls.velocity.x;
+    playerModel.position.z += controls.velocity.z;
 
-    // Update aim circle
-    const aimDistance = 5;
-    aimGroup.position.copy(activeCamera.position);
-    aimGroup.position.add(
-      new THREE.Vector3(
-        Math.sin(rotation.y) * aimDistance,
-        Math.sin(rotation.x) * aimDistance,
-        Math.cos(rotation.y) * aimDistance
-      )
-    );
-    aimGroup.lookAt(lookAtPoint);
+    playerLight.position.copy(playerModel.position);
 
-    // Update bullets
     for (let i = bullets.length - 1; i >= 0; i--) {
       const bullet = bullets[i];
       bullet.position.add(bullet.velocity);
-      bullet.distanceTraveled += bullet.velocity.length();
 
-      checkBulletCollision(bullet); // Check for collisions with target cubes
-
-      if (bullet.distanceTraveled > 50) {
-        createBulletImpact(bullet.position);
+      if (bullet.position.length() > 100) {
         scene.remove(bullet);
         bullets.splice(i, 1);
       }
     }
 
-    // Update particle systems
-    particleSystems.forEach((ps) => {
-      if (!ps.active) return;
-
-      ps.life -= clock.getDelta();
-      if (ps.life <= 0) {
-        ps.active = false;
-        ps.points.visible = false;
-      } else {
-        const positions = ps.points.geometry.attributes.position.array;
-        for (let i = 0; i < particleCount; i++) {
-          positions[i * 3] += ps.velocities[i].x;
-          positions[i * 3 + 1] += ps.velocities[i].y;
-          positions[i * 3 + 2] += ps.velocities[i].z;
-        }
-        ps.points.geometry.attributes.position.needsUpdate = true;
-        ps.points.material.opacity = ps.life;
+    for (const ufo of ufos) {
+      ufo.boundingBox.setFromObject(ufo);
+    
+      // Perbarui kecepatan jika UFO sedang mengejar pemain
+      if (gameState.score > 1000) {
+        let direction = new THREE.Vector3().subVectors(playerModel.position, ufo.position);
+        direction.normalize();
+        ufo.velocity = direction.multiplyScalar(0.6); // Kecepatan lebih tinggi saat mengejar
       }
-    });
+    
+      ufo.position.add(ufo.velocity);
+    
+      if (ufo.position.z > playerModel.position.z + 10) {
+        createExplosion(ufo.position);
+        scene.remove(ufo);
+        gameState.score -= 10;
+        ufos.splice(ufos.indexOf(ufo), 1);
+      }
+    }
+    
 
-    // Update score
-    scoreDiv.textContent = `Score: ${score}`;
+    checkCollisions();
   }
 
-  renderer.render(scene, activeCamera);
+  composer.render(); // Gunakan composer untuk rendering
 }
 
-animate();
 
-// Resize handler
+// Handle window resize
 window.addEventListener("resize", () => {
-  camera1.aspect = window.innerWidth / window.innerHeight;
-  camera2.aspect = window.innerWidth / window.innerHeight;
-  camera1.updateProjectionMatrix();
-  camera2.updateProjectionMatrix();
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight); // Update composer size
 });
+
+// Initialize UFO prototype before starting the game
+createUfoPrototype().then(() => {
+  // Spawn a UFO immediately after loading
+  spawnUfo();
+});
+
+animate();

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Game Over</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: Arial, sans-serif;
+      }
+
+      canvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: -1;
+      }
+
+      body {
+        color: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        text-align: center;
+        flex-direction: column;
+      }
+
+      .game-over-text {
+        font-size: 4em;
+        animation: pulseText 2s infinite, glowText 2s infinite;
+        margin-bottom: 20px;
+      }
+
+      @keyframes pulseText {
+        0% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.1);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+
+      @keyframes glowText {
+        0% {
+          text-shadow: 0 0 10px red, 0 0 20px red, 0 0 30px red;
+        }
+        50% {
+          text-shadow: 0 0 20px red, 0 0 30px red, 0 0 40px red;
+        }
+        100% {
+          text-shadow: 0 0 10px red, 0 0 20px red, 0 0 30px red;
+        }
+      }
+
+      p {
+        font-size: 1.5em;
+        margin-top: 10px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+      }
+
+      .container {
+        background: rgba(0, 0, 0, 0.7);
+        padding: 30px;
+        border-radius: 15px;
+        backdrop-filter: blur(5px);
+      }
+
+      input {
+        margin-top: 15px;
+        padding: 10px;
+        font-size: 1.2em;
+        border-radius: 5px;
+        border: none;
+        width: 250px;
+        background: rgba(255, 255, 255, 0.9);
+      }
+
+      .button-container {
+        display: flex;
+        gap: 15px;
+        margin-top: 20px;
+        justify-content: center;
+      }
+
+      button {
+        padding: 12px 25px;
+        font-size: 1.2em;
+        border: none;
+        background-color: rgba(255, 255, 0, 0.9);
+        color: black;
+        font-weight: bold;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      button:hover {
+        background-color: orange;
+        transform: scale(1.05);
+      }
+
+      .menu-btn {
+        background-color: rgba(0, 255, 255, 0.9);
+      }
+
+      .menu-btn:hover {
+        background-color: rgb(0, 200, 200);
+      }
+
+      .key-hint {
+        color: yellow;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1 class="game-over-text">GAME OVER</h1>
+      <p>Your Score: <span id="recentScore">0</span></p>
+
+      <input type="text" id="playerName" placeholder="Enter Your Name" />
+
+      <div class="button-container">
+        <button onclick="saveScore()">Save Score</button>
+        <button onclick="restartGame()">Restart</button>
+        <button class="menu-btn" onclick="goToMenu()">Menu</button>
+      </div>
+
+      <p>Press <span class="key-hint">SPACE</span> to Restart</p>
+    </div>
+
+    <script>
+      // Event listener untuk memastikan suara dapat diputar setelah interaksi pengguna
+      // Buat elemen audio baru
+      const mGameOver = new Audio("gameover.mp3"); // Pastikan formatnya benar
+      mGameOver.volume = 1;
+
+      // Trik autoplay dengan sedikit delay
+      setTimeout(() => {
+        mGameOver.play().catch(() => {
+          console.log("Autoplay diblokir, menunggu interaksi pengguna...");
+        });
+      }, 100);
+
+      // Fungsi untuk mengaktifkan audio setelah interaksi pengguna
+      function enableAudio() {
+        mGameOver.play();
+
+        // Hapus event listener setelah audio berhasil diputar
+        document.removeEventListener("click", enableAudio);
+        document.removeEventListener("keydown", enableAudio);
+        document.removeEventListener("mousemove", enableAudio);
+      }
+
+      // Tambahkan event listener untuk menangkap interaksi pengguna
+      document.addEventListener("click", enableAudio);
+      document.addEventListener("keydown", enableAudio);
+      document.addEventListener("mousemove", enableAudio);
+      // Three.js Setup
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      // Create particles
+      const particlesGeometry = new THREE.BufferGeometry();
+      const particlesCount = 1000;
+      const posArray = new Float32Array(particlesCount * 100);
+
+      for (let i = 0; i < particlesCount * 100; i++) {
+        posArray[i] = (Math.random() - 0.5) * 10;
+      }
+
+      particlesGeometry.setAttribute(
+        "position",
+        new THREE.BufferAttribute(posArray, 3)
+      );
+      const particlesMaterial = new THREE.PointsMaterial({
+        size: 0.005,
+        color: 0xff0000,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending,
+      });
+
+      const particlesMesh = new THREE.Points(
+        particlesGeometry,
+        particlesMaterial
+      );
+      scene.add(particlesMesh);
+
+      // Add ambient light
+      const ambientLight = new THREE.AmbientLight(0x404040);
+      scene.add(ambientLight);
+
+      camera.position.z = 5;
+
+      // Animation
+      function animate() {
+        requestAnimationFrame(animate);
+
+        particlesMesh.rotation.x += 0.001;
+        particlesMesh.rotation.y += 0.001;
+
+        renderer.render(scene, camera);
+      }
+
+      // Handle window resize
+      window.addEventListener("resize", onWindowResize, false);
+
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      // Game logic
+      let recentScore = localStorage.getItem("recentScore") || 0;
+      let score = recentScore <= 0 ? "Too low to display" : recentScore;
+      document.getElementById("recentScore").innerText = score;
+
+      function saveScore() {
+        let playerName = document.getElementById("playerName").value.trim();
+        if (!playerName) {
+          alert("Please enter your name!");
+          return;
+        }
+
+        let highScores = JSON.parse(localStorage.getItem("highScores")) || [];
+        highScores.push({ name: playerName, score: parseInt(recentScore) });
+        highScores.sort((a, b) => b.score - a.score);
+        localStorage.setItem("highScores", JSON.stringify(highScores));
+
+        alert("Score saved!");
+      }
+
+      function restartGame() {
+        window.location.href = "game.html";
+      }
+
+      function goToMenu() {
+        window.location.href = "index.html";
+      }
+
+      document.addEventListener("keydown", (event) => {
+        let inputField = document.getElementById("playerName");
+
+        if (document.activeElement === inputField) {
+          return;
+        }
+
+        if (event.key === " ") {
+          event.preventDefault();
+          restartGame();
+        }
+      });
+
+      // Start animation
+      animate();
+    </script>
+  </body>
+</html>

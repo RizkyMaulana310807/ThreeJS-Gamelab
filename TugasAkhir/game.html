@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Three.js Plane and Object</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #000;
+      }
+    </style>
+    <script>
+      // Tambahkan audio latar belakang
+      const backgroundMusic = new Audio("play.mp3"); // Pastikan file ada
+      backgroundMusic.loop = true; // Musik akan diputar terus menerus
+      backgroundMusic.volume = 0.5; // Sesuaikan volume
+
+      // Coba putar otomatis saat halaman dimuat
+      setTimeout(() => {
+        backgroundMusic.play().catch(() => {
+          console.log("Autoplay diblokir, menunggu interaksi pengguna...");
+        });
+      }, 100);
+
+      // Fungsi untuk memastikan audio diputar setelah interaksi pengguna
+      function enableAudio() {
+        backgroundMusic.play();
+
+        // Hapus event listener setelah audio berhasil diputar
+        document.removeEventListener("click", enableAudio);
+        document.removeEventListener("keydown", enableAudio);
+        document.removeEventListener("mousemove", enableAudio);
+      }
+
+      // Tambahkan event listener untuk menangkap interaksi pengguna
+      document.addEventListener("click", enableAudio);
+      document.addEventListener("keydown", enableAudio);
+      document.addEventListener("mousemove", enableAudio);
+    </script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "./node_modules/three/build/three.module.js",
+          "GLTFLoader": "./node_modules/three/examples/jsm/Addons.js",
+          "EffectComposer": "./node_modules/three/examples/jsm/postprocessing/EffectComposer.js",
+          "RenderPass": "./node_modules/three/examples/jsm/postprocessing/RenderPass.js",
+          "UnrealBloomPass": "./node_modules/three/examples/jsm/postprocessing/UnrealBloomPass.js",
+          "OrbitControls": "./node_modules/three/examples/jsm/controls/OrbitControls.js",
+          "gsap": "./node_modules/gsap/all.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
