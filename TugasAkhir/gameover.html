@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Over</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            color: white;
+            background-color: #000;
+        }
+        
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: radial-gradient(ellipse at center, #000000 0%, #0a0e24 100%);
+        }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            position: relative;
+            z-index: 1;
+            opacity: 0;
+            transition: opacity 1s ease-in;
+        }
+        
+        .container.visible {
+            opacity: 1;
+        }
+        
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #000;
+            z-index: 100;
+            flex-direction: column;
+        }
+        
+        .loading-text {
+            font-size: 1.5rem;
+            margin-top: 20px;
+            color: #ff6600;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 102, 0, 0.3);
+            border-radius: 50%;
+            border-top-color: #ff6600;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        h1 {
+            font-size: 5rem;
+            margin-bottom: 2rem;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: #ff3333;
+            text-shadow: 0 0 10px #ff0000, 0 0 20px #ff0000;
+            animation: pulse 2s infinite;
+        }
+        
+        button {
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            margin: 10px;
+            cursor: pointer;
+            border: none;
+            background-color: #FF4500;
+            color: white;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(255, 69, 0, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        button:hover {
+            background-color: #CC3700;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(255, 69, 0, 0.6);
+        }
+        
+        button:active {
+            transform: translateY(1px);
+        }
+        
+        button::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: all 0.5s;
+        }
+        
+        button:hover::after {
+            left: 100%;
+        }
+        
+        .score-display {
+            font-size: 1.8rem;
+            margin-bottom: 2rem;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px 30px;
+            border-radius: 10px;
+            border: 2px solid #ff6600;
+            box-shadow: 0 0 15px rgba(255, 102, 0, 0.5);
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); text-shadow: 0 0 10px #ff0000, 0 0 20px #ff0000; }
+            50% { transform: scale(1.05); text-shadow: 0 0 15px #ff0000, 0 0 30px #ff0000; }
+            100% { transform: scale(1); text-shadow: 0 0 10px #ff0000, 0 0 20px #ff0000; }
+        }
+        
+        .galaxy-title {
+            font-size: 6rem;
+            background: linear-gradient(to right, #ff3333, #ff6600);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 30px;
+            position: relative;
+        }
+        
+        .galaxy-title::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(to right, transparent, #ff3333, #ff6600, transparent);
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-screen" id="loadingScreen">
+        <div class="spinner"></div>
+        <div class="loading-text">Memuat alam semesta...</div>
+    </div>
+    
+    <div id="canvas-container"></div>
+    
+    <div class="container" id="gameOverContainer">
+        <h1 class="galaxy-title">GAME OVER</h1>
+        <div class="score-display">Skor Akhir: <span id="final-score">0</span></div>
+        <button onclick="goToMenu()">Kembali ke Menu</button>
+    </div>
+
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <script>
+        // Play game over sound with completion check
+        async function playGameOverSound() {
+            const audio = new Audio('lose.mp3');
+            audio.volume = 0.5;
+            
+            try {
+                await audio.play();
+                await new Promise(resolve => {
+                    audio.addEventListener('ended', resolve);
+                    setTimeout(resolve, 5000); // Fallback after 5 seconds
+                });
+            } catch (e) {
+                console.log("Audio error:", e);
+            }
+        }
+        
+        // Get final score from URL or localStorage
+        function getFinalScore() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlScore = urlParams.get('score');
+            
+            if (urlScore) return urlScore;
+            
+            const localScore = localStorage.getItem('gameScore');
+            
+            return localScore || 0;
+        }
+        
+        // Main initialization
+        async function init() {
+            // Show loading screen
+            const loadingScreen = document.getElementById('loadingScreen');
+            const gameOverContainer = document.getElementById('gameOverContainer');
+            
+            try {
+                // Initialize galaxy animation first
+                await initGalaxy();
+                
+                // Set final score
+                const finalScore = getFinalScore();
+                document.getElementById('final-score').textContent = finalScore;
+                
+                // Play sound
+                await playGameOverSound();
+                
+                // Hide loading and show content
+                loadingScreen.style.opacity = '0';
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                    gameOverContainer.classList.add('visible');
+                }, 500);
+                
+            } catch (error) {
+                console.error("Initialization error:", error);
+                // If something fails, still show the game over screen
+                loadingScreen.style.display = 'none';
+                gameOverContainer.classList.add('visible');
+            }
+        }
+        
+        function goToMenu() {
+            // Play click sound before redirecting
+            const clickSound = new Audio('click.mp3');
+            clickSound.volume = 0.3;
+            clickSound.play().then(() => {
+                window.location.href = 'index.html';
+            }).catch(e => {
+                window.location.href = 'index.html';
+            });
+        }
+        
+        // Galaxy Animation with Three.js
+        async function initGalaxy() {
+            return new Promise((resolve) => {
+                const container = document.getElementById('canvas-container');
+                
+                // Scene setup
+                const scene = new THREE.Scene();
+                scene.fog = new THREE.FogExp2(0x000000, 0.001);
+                
+                const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                const renderer = new THREE.WebGLRenderer({ 
+                    antialias: true, 
+                    alpha: true,
+                    powerPreference: "high-performance"
+                });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setPixelRatio(window.devicePixelRatio);
+                container.appendChild(renderer.domElement);
+                
+                // Galaxy parameters - adjusted for fiery colors
+                const galaxyParams = {
+                    stars: 8000, // More stars for denser look
+                    size: 0.15,  // Slightly larger particles
+                    branches: 5,
+                    spin: 1.2,   // Tighter spin
+                    randomness: 0.7,
+                    randomnessPower: 3,
+                    insideColor: '#ff6600', // Fiery orange center
+                    outsideColor: '#ff3300'  // Deep red edges
+                };
+                
+                // Create galaxy geometry
+                const geometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(galaxyParams.stars * 3);
+                const colors = new Float32Array(galaxyParams.stars * 3);
+                
+                const insideColor = new THREE.Color(galaxyParams.insideColor);
+                const outsideColor = new THREE.Color(galaxyParams.outsideColor);
+                
+                // Add some nebula-like background particles
+                const nebulaParticles = 2000;
+                const nebulaPositions = new Float32Array(nebulaParticles * 3);
+                const nebulaColors = new Float32Array(nebulaParticles * 3);
+                const nebulaSizes = new Float32Array(nebulaParticles);
+                
+                // Create main galaxy particles
+                for(let i = 0; i < galaxyParams.stars; i++) {
+                    const i3 = i * 3;
+                    
+                    // Position with more randomness at edges
+                    const radius = Math.pow(Math.random(), 0.5) * 15;
+                    const spinAngle = radius * galaxyParams.spin;
+                    const branchAngle = (i % galaxyParams.branches) / galaxyParams.branches * Math.PI * 2;
+                    
+                    const randomX = Math.pow(Math.random(), galaxyParams.randomnessPower) * 
+                        (Math.random() < 0.5 ? 1 : -1) * galaxyParams.randomness * radius;
+                    const randomY = Math.pow(Math.random(), galaxyParams.randomnessPower) * 
+                        (Math.random() < 0.5 ? 1 : -1) * galaxyParams.randomness * radius * 0.3;
+                    const randomZ = Math.pow(Math.random(), galaxyParams.randomnessPower) * 
+                        (Math.random() < 0.5 ? 1 : -1) * galaxyParams.randomness * radius;
+                    
+                    positions[i3] = Math.cos(branchAngle + spinAngle) * radius + randomX;
+                    positions[i3 + 1] = randomY;
+                    positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * radius + randomZ;
+                    
+                    // Color gradient with more fiery tones
+                    const colorMix = radius / 15;
+                    const mixedColor = insideColor.clone();
+                    mixedColor.lerp(outsideColor, colorMix);
+                    
+                    // Add some variation to colors
+                    if (Math.random() > 0.7) {
+                        mixedColor.offsetHSL(0, 0.1, Math.random() * 0.1 - 0.05);
+                    }
+                    
+                    colors[i3] = mixedColor.r;
+                    colors[i3 + 1] = mixedColor.g;
+                    colors[i3 + 2] = mixedColor.b;
+                }
+                
+                // Create nebula background particles
+                for(let i = 0; i < nebulaParticles; i++) {
+                    const i3 = i * 3;
+                    
+                    // Random positions in a larger volume
+                    nebulaPositions[i3] = (Math.random() - 0.5) * 40;
+                    nebulaPositions[i3 + 1] = (Math.random() - 0.5) * 40;
+                    nebulaPositions[i3 + 2] = (Math.random() - 0.5) * 40;
+                    
+                    // Subtle blue/purple nebula colors
+                    const nebulaColor = new THREE.Color(
+                        0.1 + Math.random() * 0.1,
+                        0.05 + Math.random() * 0.05,
+                        0.2 + Math.random() * 0.1
+                    );
+                    
+                    nebulaColors[i3] = nebulaColor.r;
+                    nebulaColors[i3 + 1] = nebulaColor.g;
+                    nebulaColors[i3 + 2] = nebulaColor.b;
+                    
+                    // Random sizes
+                    nebulaSizes[i] = 0.5 + Math.random() * 2;
+                }
+                
+                // Set up galaxy geometry
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+                
+                // Galaxy material - more fiery appearance
+                const material = new THREE.PointsMaterial({
+                    size: galaxyParams.size,
+                    sizeAttenuation: true,
+                    depthWrite: false,
+                    blending: THREE.AdditiveBlending,
+                    vertexColors: true,
+                    transparent: true,
+                    opacity: 0.9,
+                    alphaTest: 0.01
+                });
+                
+                // Galaxy points
+                const galaxy = new THREE.Points(geometry, material);
+                scene.add(galaxy);
+                
+                // Nebula geometry
+                const nebulaGeometry = new THREE.BufferGeometry();
+                nebulaGeometry.setAttribute('position', new THREE.BufferAttribute(nebulaPositions, 3));
+                nebulaGeometry.setAttribute('color', new THREE.BufferAttribute(nebulaColors, 3));
+                nebulaGeometry.setAttribute('size', new THREE.BufferAttribute(nebulaSizes, 1));
+                
+                // Nebula material
+                const nebulaMaterial = new THREE.PointsMaterial({
+                    size: 1,
+                    sizeAttenuation: true,
+                    vertexColors: true,
+                    transparent: true,
+                    opacity: 0.3,
+                    blending: THREE.AdditiveBlending
+                });
+                
+                // Nebula points
+                const nebula = new THREE.Points(nebulaGeometry, nebulaMaterial);
+                scene.add(nebula);
+                
+                // Camera position
+                camera.position.z = 20;
+                
+                // Add central supernova effect
+                const supernovaGeometry = new THREE.SphereGeometry(1.5, 32, 32);
+                const supernovaMaterial = new THREE.MeshBasicMaterial({ 
+                    color: 0xff6600,
+                    transparent: true,
+                    opacity: 0.9,
+                    blending: THREE.AdditiveBlending
+                });
+                const supernova = new THREE.Mesh(supernovaGeometry, supernovaMaterial);
+                scene.add(supernova);
+                
+                // Add fiery accretion disk
+                const diskGeometry = new THREE.RingGeometry(2, 4, 64);
+                const diskMaterial = new THREE.MeshBasicMaterial({ 
+                    color: 0xff3300,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.7,
+                    blending: THREE.AdditiveBlending
+                });
+                const disk = new THREE.Mesh(diskGeometry, diskMaterial);
+                disk.rotation.x = Math.PI / 2;
+                scene.add(disk);
+                
+                // Add particle explosions
+                const explosionGeometry = new THREE.BufferGeometry();
+                const explosionCount = 20;
+                const explosionPositions = new Float32Array(explosionCount * 3);
+                const explosionSizes = new Float32Array(explosionCount);
+                
+                for (let i = 0; i < explosionCount; i++) {
+                    const i3 = i * 3;
+                    const angle = Math.random() * Math.PI * 2;
+                    const distance = 3 + Math.random() * 5;
+                    
+                    explosionPositions[i3] = Math.cos(angle) * distance;
+                    explosionPositions[i3 + 1] = (Math.random() - 0.5) * 2;
+                    explosionPositions[i3 + 2] = Math.sin(angle) * distance;
+                    
+                    explosionSizes[i] = 2 + Math.random() * 3;
+                }
+                
+                explosionGeometry.setAttribute('position', new THREE.BufferAttribute(explosionPositions, 3));
+                explosionGeometry.setAttribute('size', new THREE.BufferAttribute(explosionSizes, 1));
+                
+                const explosionMaterial = new THREE.PointsMaterial({
+                    size: 1,
+                    sizeAttenuation: true,
+                    color: 0xff9933,
+                    transparent: true,
+                    opacity: 0.8,
+                    blending: THREE.AdditiveBlending
+                });
+                
+                const explosions = new THREE.Points(explosionGeometry, explosionMaterial);
+                scene.add(explosions);
+                
+                // Animation loop
+                function animate() {
+                    requestAnimationFrame(animate);
+                    
+                    // Rotate galaxy with varying speeds
+                    galaxy.rotation.y += 0.0015;
+                    galaxy.rotation.x += 0.0003;
+                    
+                    // Rotate supernova and disk
+                    supernova.rotation.y += 0.02;
+                    disk.rotation.z += 0.015;
+                    
+                    // Pulsing supernova effect
+                    supernova.scale.setScalar(1 + Math.sin(Date.now() * 0.002) * 0.1);
+                    supernovaMaterial.opacity = 0.8 + Math.sin(Date.now() * 0.003) * 0.1;
+                    
+                    // Animate explosions
+                    const time = Date.now() * 0.001;
+                    const positions = explosionGeometry.attributes.position.array;
+                    const sizes = explosionGeometry.attributes.size.array;
+                    
+                    for (let i = 0; i < explosionCount; i++) {
+                        const i3 = i * 3;
+                        const offset = i * 0.1;
+                        positions[i3 + 1] += Math.sin(time + offset) * 0.05;
+                        sizes[i] = 2 + Math.sin(time * 2 + offset) * 1.5;
+                    }
+                    
+                    explosionGeometry.attributes.size.needsUpdate = true;
+                    
+                    renderer.render(scene, camera);
+                }
+                
+                // Handle window resize
+                window.addEventListener('resize', () => {
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+                
+                // Start animation
+                animate();
+                
+                // Resolve promise when ready
+                setTimeout(resolve, 300); // Small delay to ensure everything is ready
+            });
+        }
+        
+        // Start everything when loaded
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

@@ -17,7 +17,7 @@ camera.position.set(0, 5, 20);
 document.body.appendChild(renderer.domElement);
 
 // Background
-scene.background = new THREE.Color(0xffc809);
+scene.background = new THREE.Color(0x0000FF);
 
 // Teks
 let textMesh;
@@ -30,7 +30,7 @@ const textTexture = textureLoader.load("image.png"); // Ganti dengan path tekstu
 loader.load(
   "./node_modules/three/examples/fonts/droid/droid_sans_bold.typeface.json",
   function (font) {
-    const texGeo = new TextGeometry("Hello world, from Rizky Maulana", {
+    const texGeo = new TextGeometry("hello world, from galih ramdhan agung prastyo", {
       font: font,
       size: 1,
       height: 0.5,

@@ -1,7 +1,7 @@
-import * as THREE from "/node_modules/three/src/Three.js";
-import CannonDebugger from "/node_modules/cannon-es-debugger/dist/cannon-es-debugger.js";
-import * as CANNON from "/node_modules/cannon-es/dist/cannon-es.js";
-import { OrbitControls } from "/node_modules/three/examples/jsm/controls/OrbitControls.js";
+import * as THREE from "three";
+import CannonDebugger from "cannon-es-debugger";
+import * as CANNON from "cannon-es";
+import { OrbitControls } from "OrbitControls";
 
 document.addEventListener("DOMContentLoaded", () => {
   const scene = new THREE.Scene();
@@ -20,6 +20,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Add back OrbitControls
   const controls = new OrbitControls(camera, renderer.domElement);
   camera.position.set(0, 3, 8);
+  camera.rotation.set(Math.PI / 4, 0, 0); // Putar kamera 45° pada sumbu X
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
   controls.rotateSpeed = 0.5;
@@ -43,7 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let texture;
   try {
     texture = textureLoader.load(
-      "/src/img/gawrgura.jpeg",
+      "./src/img/image.png",
       undefined,
       undefined,
       (error) => {

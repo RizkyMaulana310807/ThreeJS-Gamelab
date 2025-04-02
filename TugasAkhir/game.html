@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Three.js Plane and Object</title>
+    <title>Game ThreeJS</title>
     <style>
       body {
         margin: 0;
@@ -11,34 +11,6 @@
         background-color: #000;
       }
     </style>
-    <script>
-      // Tambahkan audio latar belakang
-      const backgroundMusic = new Audio("play.mp3"); // Pastikan file ada
-      backgroundMusic.loop = true; // Musik akan diputar terus menerus
-      backgroundMusic.volume = 0.5; // Sesuaikan volume
-
-      // Coba putar otomatis saat halaman dimuat
-      setTimeout(() => {
-        backgroundMusic.play().catch(() => {
-          console.log("Autoplay diblokir, menunggu interaksi pengguna...");
-        });
-      }, 100);
-
-      // Fungsi untuk memastikan audio diputar setelah interaksi pengguna
-      function enableAudio() {
-        backgroundMusic.play();
-
-        // Hapus event listener setelah audio berhasil diputar
-        document.removeEventListener("click", enableAudio);
-        document.removeEventListener("keydown", enableAudio);
-        document.removeEventListener("mousemove", enableAudio);
-      }
-
-      // Tambahkan event listener untuk menangkap interaksi pengguna
-      document.addEventListener("click", enableAudio);
-      document.addEventListener("keydown", enableAudio);
-      document.addEventListener("mousemove", enableAudio);
-    </script>
     <script type="importmap">
       {
         "imports": {

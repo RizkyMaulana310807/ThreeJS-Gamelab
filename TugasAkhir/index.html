@@ -1,262 +1,320 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Game Menu</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Menu Game</title>
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-        font-family: Arial, sans-serif;
-      }
-
-      canvas {
-        position: fixed;
-        top: 0;
-        left: 0;
-        z-index: -1;
-      }
-
-      body {
-        color: white;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-        text-align: center;
-        flex-direction: column;
-      }
-
-      h1 {
-        font-size: 3em;
-        text-shadow: 2px 2px 10px red;
-        margin-bottom: 20px;
-        position: relative;
-      }
-
-      .menu-container {
-        display: flex;
-        flex-direction: column;
-        gap: 15px;
-        position: relative;
-      }
-
-      button {
-        padding: 15px 30px;
-        font-size: 1.5em;
-        border: none;
-        border-radius: 10px;
-        cursor: pointer;
-        width: 200px;
-        background-color: rgba(255, 255, 0, 0.8);
-        backdrop-filter: blur(5px);
-      }
-
-      .play-btn {
-        color: black;
-        font-weight: bold;
-        transition: all 0.3s ease;
-      }
-
-      .play-btn:hover {
-        background-color: rgba(255, 165, 0, 0.8);
-        transform: scale(1.05);
-      }
-
-      .highscores {
-        margin-top: 30px;
-        width: 80%;
-        max-width: 400px;
-        text-align: left;
-        background-color: rgba(0, 0, 0, 0.5);
-        padding: 20px;
-        border-radius: 15px;
-        backdrop-filter: blur(5px);
-      }
-
-      .highscores h2 {
-        text-align: center;
-        font-size: 1.8em;
-        text-shadow: 1px 1px 5px cyan;
-        margin-bottom: 15px;
-      }
-
-      .score-list {
-        list-style: none;
-        padding: 0;
-      }
-
-      .score-list li {
-        background: rgba(255, 255, 255, 0.1);
-        padding: 10px;
-        margin: 5px 0;
-        border-radius: 5px;
-        display: flex;
-        justify-content: space-between;
-      }
-    </style>
-  </head>
-  <body>
-    <h1>GAME MENU</h1>
-
-    <div class="menu-container">
-      <button class="play-btn" onclick="startGame()">Play Game</button>
-    </div>
-
-    <div class="highscores">
-      <h2>High Scores</h2>
-      <ul id="scoreList" class="score-list"></ul>
-    </div>
-
-    <script>
-      // Tambahkan audio latar belakang
-      const backgroundMusic = new Audio("play.mp3"); // Pastikan file ada
-      backgroundMusic.loop = true; // Musik akan diputar terus menerus
-      backgroundMusic.volume = 0.5; // Sesuaikan volume
-
-      // Coba putar otomatis saat halaman dimuat
-      setTimeout(() => {
-        backgroundMusic.play().catch(() => {
-          console.log("Autoplay diblokir, menunggu interaksi pengguna...");
-        });
-      }, 100);
-
-      // Fungsi untuk memastikan audio diputar setelah interaksi pengguna
-      function enableAudio() {
-        backgroundMusic.play();
-
-        // Hapus event listener setelah audio berhasil diputar
-        document.removeEventListener("click", enableAudio);
-        document.removeEventListener("keydown", enableAudio);
-        document.removeEventListener("mousemove", enableAudio);
-      }
-
-      // Tambahkan event listener untuk menangkap interaksi pengguna
-      document.addEventListener("click", enableAudio);
-      document.addEventListener("keydown", enableAudio);
-      document.addEventListener("mousemove", enableAudio);
-    </script>
-
-    <script>
-      // Three.js Setup
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(
-        75,
-        window.innerWidth / window.innerHeight,
-        0.1,
-        1000
-      );
-      const renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      document.body.appendChild(renderer.domElement);
-
-      // Create objects
-      const geometry = new THREE.TorusKnotGeometry(1, 0.3, 100, 16);
-      const material = new THREE.MeshPhongMaterial({
-        color: 0x00ff00,
-        shininess: 100,
-        specular: 0x444444,
-      });
-      const torusKnot = new THREE.Mesh(geometry, material);
-      scene.add(torusKnot);
-
-      // Add floating cubes
-      const cubes = [];
-      for (let i = 0; i < 50; i++) {
-        const cubeGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-        const cubeMaterial = new THREE.MeshPhongMaterial({
-          color: new THREE.Color(Math.random(), Math.random(), Math.random()),
-          shininess: 50,
-        });
-        const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-        cube.position.set(
-          (Math.random() - 0.5) * 10,
-          (Math.random() - 0.5) * 10,
-          (Math.random() - 0.5) * 10
-        );
-        cube.rotation.set(
-          Math.random() * Math.PI,
-          Math.random() * Math.PI,
-          Math.random() * Math.PI
-        );
-        scene.add(cube);
-        cubes.push({
-          mesh: cube,
-          rotationSpeed: {
-            x: (Math.random() - 0.5) * 0.02,
-            y: (Math.random() - 0.5) * 0.02,
-            z: (Math.random() - 0.5) * 0.02,
-          },
-        });
-      }
-
-      // Add lights
-      const ambientLight = new THREE.AmbientLight(0x404040);
-      scene.add(ambientLight);
-
-      const pointLight = new THREE.PointLight(0xffffff, 1, 100);
-      pointLight.position.set(5, 5, 5);
-      scene.add(pointLight);
-
-      const pointLight2 = new THREE.PointLight(0xff0000, 1, 100);
-      pointLight2.position.set(-5, -5, -5);
-      scene.add(pointLight2);
-
-      camera.position.z = 5;
-
-      // Animation
-      function animate() {
-        requestAnimationFrame(animate);
-
-        torusKnot.rotation.x += 0.01;
-        torusKnot.rotation.y += 0.01;
-
-        cubes.forEach((cube) => {
-          cube.mesh.rotation.x += cube.rotationSpeed.x;
-          cube.mesh.rotation.y += cube.rotationSpeed.y;
-          cube.mesh.rotation.z += cube.rotationSpeed.z;
-        });
-
-        renderer.render(scene, camera);
-      }
-
-      // Handle window resize
-      window.addEventListener("resize", onWindowResize, false);
-
-      function onWindowResize() {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-      }
-
-      // Game functions
-      function startGame() {
-        window.location.href = "game.html";
-      }
-
-      function loadHighScores() {
-        let highScores = JSON.parse(localStorage.getItem("highScores")) || [];
-        let scoreList = document.getElementById("scoreList");
-
-        scoreList.innerHTML = "";
-
-        if (highScores.length === 0) {
-          scoreList.innerHTML = "<li>No high scores yet.</li>";
-        } else {
-          highScores.forEach((score) => {
-            let li = document.createElement("li");
-            li.innerHTML = `<span>${score.name}</span> <span>${score.score}</span>`;
-            scoreList.appendChild(li);
-          });
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            color: white;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
         }
-      }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            position: relative;
+            z-index: 1;
+        }
+        
+        h1 {
+            font-size: 4rem;
+            margin-bottom: 2rem;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: #4CAF50;
+            text-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+            animation: pulse 2s infinite;
+        }
+        
+        .menu-buttons {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        button {
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            margin: 15px;
+            cursor: pointer;
+            border: none;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+            width: 200px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(76, 175, 80, 0.6);
+        }
+        
+        button:active {
+            transform: translateY(1px);
+        }
+        
+        button::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: all 0.5s;
+        }
+        
+        button:hover::after {
+            left: 100%;
+        }
+        
+        .audio-control {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 10;
+        }
+        
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .game-title {
+            font-size: 5rem;
+            margin-bottom: 30px;
+            background: linear-gradient(to right, #4CAF50, #2E8B57);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="particles" id="particles-js"></div>
+    
+    <div class="audio-control" id="audioControl">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="white">
+            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+        </svg>
+    </div>
+    
+    <div class="container">
+        <h1 class="game-title">Space Defender</h1>
+        <div class="menu-buttons">
+            <button onclick="startGame()">Mulai Permainan</button>
+            <button onclick="showInstructions()">Petunjuk</button>
+            <button onclick="showCredits()">Kredit</button>
+        </div>
+    </div>
 
-      // Start animation and load scores
-      animate();
-      window.onload = loadHighScores;
+    <!-- Include particles.js library -->
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    
+    <script>
+        // Background music
+        const bgMusic = new Audio('bgsound.mp3');
+        bgMusic.loop = true;
+        bgMusic.volume = 0.3;
+        
+        // Try to play music (will work if user has interacted with page)
+        function tryPlayMusic() {
+            const promise = bgMusic.play();
+            if (promise !== undefined) {
+                promise.catch(error => {
+                    console.log("Autoplay prevented, will wait for user interaction");
+                });
+            }
+        }
+        
+        // Initial try to play music
+        tryPlayMusic();
+        
+        // Audio control button
+        let isMuted = false;
+        document.getElementById('audioControl').addEventListener('click', function() {
+            isMuted = !isMuted;
+            bgMusic.muted = isMuted;
+            
+            // Update icon
+            const icon = this.querySelector('svg');
+            if (isMuted) {
+                icon.innerHTML = '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
+            } else {
+                icon.innerHTML = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+                tryPlayMusic();
+            }
+        });
+        
+        // Initialize particles.js
+        particlesJS("particles-js", {
+            "particles": {
+                "number": {
+                    "value": 80,
+                    "density": {
+                        "enable": true,
+                        "value_area": 800
+                    }
+                },
+                "color": {
+                    "value": "#4CAF50"
+                },
+                "shape": {
+                    "type": "circle",
+                    "stroke": {
+                        "width": 0,
+                        "color": "#000000"
+                    },
+                    "polygon": {
+                        "nb_sides": 5
+                    }
+                },
+                "opacity": {
+                    "value": 0.5,
+                    "random": false,
+                    "anim": {
+                        "enable": false,
+                        "speed": 1,
+                        "opacity_min": 0.1,
+                        "sync": false
+                    }
+                },
+                "size": {
+                    "value": 3,
+                    "random": true,
+                    "anim": {
+                        "enable": false,
+                        "speed": 40,
+                        "size_min": 0.1,
+                        "sync": false
+                    }
+                },
+                "line_linked": {
+                    "enable": true,
+                    "distance": 150,
+                    "color": "#4CAF50",
+                    "opacity": 0.4,
+                    "width": 1
+                },
+                "move": {
+                    "enable": true,
+                    "speed": 2,
+                    "direction": "none",
+                    "random": false,
+                    "straight": false,
+                    "out_mode": "out",
+                    "bounce": false,
+                    "attract": {
+                        "enable": false,
+                        "rotateX": 600,
+                        "rotateY": 1200
+                    }
+                }
+            },
+            "interactivity": {
+                "detect_on": "canvas",
+                "events": {
+                    "onhover": {
+                        "enable": true,
+                        "mode": "grab"
+                    },
+                    "onclick": {
+                        "enable": true,
+                        "mode": "push"
+                    },
+                    "resize": true
+                },
+                "modes": {
+                    "grab": {
+                        "distance": 140,
+                        "line_linked": {
+                            "opacity": 1
+                        }
+                    },
+                    "bubble": {
+                        "distance": 400,
+                        "size": 40,
+                        "duration": 2,
+                        "opacity": 8,
+                        "speed": 3
+                    },
+                    "repulse": {
+                        "distance": 200,
+                        "duration": 0.4
+                    },
+                    "push": {
+                        "particles_nb": 4
+                    },
+                    "remove": {
+                        "particles_nb": 2
+                    }
+                }
+            },
+            "retina_detect": true
+        });
+
+        function startGame() {
+            // Play click sound
+            const clickSound = new Audio('click.mp3');
+            clickSound.volume = 0.5;
+            clickSound.play();
+            
+            // Fade out music before redirecting
+            const fadeAudio = setInterval(() => {
+                if (bgMusic.volume > 0.1) {
+                    bgMusic.volume -= 0.1;
+                } else {
+                    bgMusic.pause();
+                    clearInterval(fadeAudio);
+                    
+                    window.location.href = 'game.html';
+                }
+            }, 100);
+        }
+        
+        function showInstructions() {
+            alert("Petunjuk Permainan:\n\n1. Gunakan tombol panah atas/bawah untuk mengontrol ketinggian pesawat\n2. Klik atau tekan spasi untuk menembak\n3. Hindari UFO yang mendekat\n4. Tembak UFO untuk mendapatkan poin");
+        }
+        
+        function showCredits() {
+            alert("Kredit:\n\nGame dibuat oleh [Haris Budi Setiawan]\nMusik oleh [Pixabay]\nAset 3D oleh [Free3dAsset]");
+        }
+        
+        // Play music when user interacts with page (fallback for autoplay restrictions)
+        document.addEventListener('click', function() {
+            tryPlayMusic();
+        }, { once: true });
     </script>
-  </body>
+</body>
 </html>

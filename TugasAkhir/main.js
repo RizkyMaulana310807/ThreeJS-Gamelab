@@ -4,6 +4,10 @@ import { EffectComposer } from "EffectComposer";
 import { RenderPass } from "RenderPass";
 import { UnrealBloomPass } from "UnrealBloomPass";
 
+
+const bgm = new Audio("playsound.mp3").play();
+
+
 // Game state
 const gameState = {
   score: 0,
@@ -25,7 +29,24 @@ document.addEventListener("keydown", (event) => {
     cameraHeight -= cameraSpeed; // Turunkan kamera
   }
 });
+// Tambahkan di bagian control sebelumnya
+document.addEventListener("keydown", (event) => {
+  if (gameState.isGameOver) return;
 
+  // Gerak kiri-kanan
+  if (event.key === "ArrowLeft") {
+    controls.velocity.x = -0.5; // Bergerak ke kiri
+  } else if (event.key === "ArrowRight") {
+    controls.velocity.x = 0.5; // Bergerak ke kanan
+  }
+});
+
+// Tambahkan event listener untuk menghentikan gerakan saat tombol dilepas
+document.addEventListener("keyup", (event) => {
+  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+    controls.velocity.x = 0; // Hentikan gerakan horizontal
+  }
+});
 
 // Setup scene
 const scene = new THREE.Scene();
@@ -37,7 +58,65 @@ const camera = new THREE.PerspectiveCamera(
 );
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true; // Aktifkan shadow map
+renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Jenis shadow map (opsional, untuk bayangan lebih lembut)
 document.body.appendChild(renderer.domElement);
+
+// Tambahkan pada bagian atas file, setelah inisialisasi THREE
+const explosionParticles = [];
+const explosionGeometry = new THREE.BufferGeometry();
+const explosionMaterial = new THREE.PointsMaterial({
+  color: 0xff6600, // Warna oranye kemerahan
+  size: 0.3,
+  transparent: true,
+  blending: THREE.AdditiveBlending,
+  opacity: 1,
+});
+
+function createExplosion(position) {
+  const particleCount = 50;
+  const positions = new Float32Array(particleCount * 3);
+  const velocities = new Float32Array(particleCount * 3);
+
+  for (let i = 0; i < particleCount; i++) {
+    const i3 = i * 3;
+    // Posisi awal partikel di sekitar posisi ledakan
+    positions[i3] = position.x + (Math.random() - 0.5) * 2;
+    positions[i3 + 1] = position.y + (Math.random() - 0.5) * 2;
+    positions[i3 + 2] = position.z + (Math.random() - 0.5) * 2;
+
+    // Kecepatan partikel acak
+    velocities[i3] = (Math.random() - 0.5) * 0.5;
+    velocities[i3 + 1] = (Math.random() - 0.5) * 0.5;
+    velocities[i3 + 2] = (Math.random() - 0.5) * 0.5;
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+
+  const material = explosionMaterial.clone();
+  material.opacity = 1;
+
+  const explosion = new THREE.Points(geometry, material);
+  explosion.velocities = velocities;
+  explosion.createdAt = Date.now();
+
+  explosionParticles.push(explosion);
+  scene.add(explosion);
+}
+
+// 1. Tambahkan directional light
+const light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(10, 20, 10);
+light.castShadow = true; // Aktifkan pemancaran bayangan
+light.shadow.mapSize.width = 1024; // default
+light.shadow.mapSize.height = 1024; // default
+light.shadow.camera.near = 1; // default
+light.shadow.camera.far = 50; // default
+scene.add(light);
+
+// const helper = new THREE.CameraHelper(light.shadow.camera);
+// scene.add(helper);
 
 // Post-processing setup
 const composer = new EffectComposer(renderer);
@@ -117,16 +196,17 @@ document.body.appendChild(gameOverScreen);
 
 // Setup plane
 const planeGeometry = new THREE.PlaneGeometry(1000, 1000);
-const planeMaterial = new THREE.MeshStandardMaterial({ color: 0x111111 });
+const planeMaterial = new THREE.MeshStandardMaterial({ color: 0x010101 });
 const plane = new THREE.Mesh(planeGeometry, planeMaterial);
 plane.rotation.x = -Math.PI / 2;
+plane.receiveShadow = true;
 scene.add(plane);
 
 // Lighting
 const ambientLight = new THREE.AmbientLight(0x333333, 1);
 scene.add(ambientLight);
 
-const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+const directionalLight = new THREE.DirectionalLight(0xffffff, 5);
 directionalLight.position.set(10, 20, 10);
 scene.add(directionalLight);
 
@@ -170,7 +250,7 @@ const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
 
 function shoot() {
   if (!playerModel || gameState.isGameOver) return;
-
+  const sfx = new Audio("laser.mp3").play();
   const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
   bullet.position.copy(playerModel.position);
   bullet.boundingBox = new THREE.Box3().setFromObject(bullet);
@@ -179,9 +259,6 @@ function shoot() {
   direction.applyQuaternion(playerModel.quaternion);
   bullet.velocity = direction.multiplyScalar(-1);
 
-  const shootSfx = new Audio("shoot.mp3");
-  shootSfx.volume = 0.2;
-  shootSfx.play();
   bullets.push(bullet);
   scene.add(bullet);
 }
@@ -195,6 +272,7 @@ loader.load(
     playerModel = gltf.scene;
     playerModel.scale.set(1, 1, 1);
     playerModel.rotation.y = Math.PI;
+    playerModel.castShadow = true; // Aktifkan bayangan
     scene.add(playerModel);
 
     gameState.loadedModels.player = true;
@@ -256,9 +334,12 @@ function createUfoPrototype() {
       (gltf) => {
         ufoPrototype = gltf.scene;
         ufoPrototype.visible = false;
+        ufoPrototype.castShadow = true;
+
         // Create a larger bounding box by expanding it by 4 units (previously was 2)
         ufoPrototype.boundingBox = new THREE.Box3().setFromObject(ufoPrototype);
         ufoPrototype.boundingBox.expandByScalar(4);
+        // Contoh untuk UFO
         scene.add(ufoPrototype);
 
         gameState.loadedModels.ufo = true;
@@ -273,68 +354,6 @@ function createUfoPrototype() {
   });
 }
 
-function createExplosion(position) {
-  const particleCount = 100;
-  const geometry = new THREE.BufferGeometry();
-  const positions = new Float32Array(particleCount * 3);
-  const velocities = [];
-
-  for (let i = 0; i < particleCount; i++) {
-    const i3 = i * 3;
-    positions[i3] = position.x;
-    positions[i3 + 1] = position.y;
-    positions[i3 + 2] = position.z;
-
-    // Kecepatan acak untuk setiap partikel
-    velocities.push(
-      (Math.random() - 0.5) * 2, // X
-      (Math.random() - 0.5) * 2, // Y
-      (Math.random() - 0.5) * 2 // Z
-    );
-  }
-
-  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-
-  const material = new THREE.PointsMaterial({
-    color: 0xff6600,
-    size: 0.5,
-    transparent: true,
-    opacity: 1,
-    blending: THREE.AdditiveBlending,
-  });
-
-  const particles = new THREE.Points(geometry, material);
-  scene.add(particles);
-
-  // Animasikan partikel
-  const explosionDuration = 1.5;
-  let elapsedTime = 0;
-
-  function animateExplosion(deltaTime) {
-    elapsedTime += deltaTime;
-
-    if (elapsedTime > explosionDuration) {
-      scene.remove(particles);
-      return;
-    }
-
-    const positions = particles.geometry.attributes.position.array;
-    for (let i = 0; i < particleCount; i++) {
-      const i3 = i * 3;
-      positions[i3] += velocities[i3] * deltaTime * 10;
-      positions[i3 + 1] += velocities[i3 + 1] * deltaTime * 10;
-      positions[i3 + 2] += velocities[i3 + 2] * deltaTime * 10;
-    }
-
-    particles.geometry.attributes.position.needsUpdate = true;
-
-    requestAnimationFrame(() => animateExplosion(0.016));
-  }
-
-  animateExplosion(0.016);
-}
-
-// Collision detection
 function checkCollisions() {
   // Bullet-UFO collisions
   for (let i = bullets.length - 1; i >= 0; i--) {
@@ -343,13 +362,13 @@ function checkCollisions() {
       const ufo = ufos[j];
       // Increased collision distance from 1 to 2 for easier hits
       if (bullet.position.distanceTo(ufo.position) < 2) {
+        const sfx = new Audio("explosion.mp3").play();
+
+        // Tambahkan efek ledakan
+        createExplosion(ufo.position);
+
         scene.remove(bullet);
         bullets.splice(i, 1);
-
-        const explosionSfx = new Audio("expolosion.mp3");
-        explosionSfx.volume = 0.2;
-        explosionSfx.play();
-        createExplosion(ufo.position);
         scene.remove(ufo);
         ufos.splice(j, 1);
 
@@ -365,20 +384,19 @@ function checkCollisions() {
     // Keeping player collision distance at 2 for fair gameplay
     if (playerModel.position.distanceTo(ufo.position) < 2) {
       gameState.isGameOver = true;
-      window.location.href = "game-over.html";
-      localStorage.setItem("recentScore", gameState.score);
+      window.location.href = `gameover.html?score=${gameState.score}`;
     }
   }
 }
 
-function cloneUfo() {
-  if (!ufoPrototype) return null;
+// function cloneUfo() {
+//   if (!ufoPrototype) return null;
 
-  const ufoClone = ufoPrototype.clone();
-  ufoClone.visible = true;
-  ufoClone.boundingBox = new THREE.Box3().setFromObject(ufoClone); // ✅ Initialize bounding box
-  return ufoClone;
-}
+//   const ufoClone = ufoPrototype.clone();
+//   ufoClone.visible = true;
+//   ufoClone.boundingBox = new THREE.Box3().setFromObject(ufoClone); // ✅ Initialize bounding box
+//   return ufoClone;
+// }
 
 function spawnUfo() {
   if (!ufoPrototype || ufos.length >= maxUfos || gameState.isGameOver) return;
@@ -395,11 +413,15 @@ function spawnUfo() {
     1,
     playerModel.position.z - 50
   );
+  ufo.rotation.set(5, 0, 0);
 
   // UFO mengejar pemain jika skor > 1000
   ufo.updateVelocity = function () {
     if (gameState.score > 1000) {
-      let direction = new THREE.Vector3().subVectors(playerModel.position, ufo.position);
+      let direction = new THREE.Vector3().subVectors(
+        playerModel.position,
+        ufo.position
+      );
       direction.normalize();
       ufo.velocity = direction.multiplyScalar(0.5);
     } else {
@@ -429,7 +451,7 @@ document.addEventListener("keydown", (event) => {
 });
 
 // Camera setup
-camera.position.set(0, 10, 1);
+camera.position.set(0, 0, 0);
 
 // Animation loop
 function animate() {
@@ -437,10 +459,36 @@ function animate() {
 
   if (gameState.isLoading) return;
 
+  for (let i = explosionParticles.length - 1; i >= 0; i--) {
+    const explosion = explosionParticles[i];
+    const positions = explosion.geometry.attributes.position.array;
+    const velocities = explosion.velocities;
+
+    // Pergerakan partikel
+    for (let j = 0; j < positions.length; j++) {
+      positions[j] += velocities[j];
+    }
+    explosion.geometry.attributes.position.needsUpdate = true;
+
+    // Fade out effect
+    const age = Date.now() - explosion.createdAt;
+    explosion.material.opacity = Math.max(0, 1 - age / 500);
+
+    // Hapus partikel setelah beberapa saat
+    if (age > 500) {
+      scene.remove(explosion);
+      explosionParticles.splice(i, 1);
+    }
+  }
+
   scoreDisplay.textContent = `Score: ${gameState.score}`;
 
   // Pastikan kamera tetap pada ketinggian yang diperbarui
-  camera.position.set(playerModel.position.x, cameraHeight, playerModel.position.z + 25);
+  camera.position.set(
+    playerModel.position.x,
+    cameraHeight,
+    playerModel.position.z + 25
+  );
   camera.lookAt(playerModel.position);
 
   if (playerModel && !gameState.isGameOver) {
@@ -460,32 +508,34 @@ function animate() {
     }
 
     for (const ufo of ufos) {
+      ufo.rotation.z += 0.05; // Sesuaikan kecepatan rotasi sesuai keinginan
+
       ufo.boundingBox.setFromObject(ufo);
-    
+
       // Perbarui kecepatan jika UFO sedang mengejar pemain
       if (gameState.score > 1000) {
-        let direction = new THREE.Vector3().subVectors(playerModel.position, ufo.position);
+        let direction = new THREE.Vector3().subVectors(
+          playerModel.position,
+          ufo.position
+        );
         direction.normalize();
         ufo.velocity = direction.multiplyScalar(0.6); // Kecepatan lebih tinggi saat mengejar
       }
-    
+
       ufo.position.add(ufo.velocity);
-    
+
       if (ufo.position.z > playerModel.position.z + 10) {
-        createExplosion(ufo.position);
         scene.remove(ufo);
         gameState.score -= 10;
         ufos.splice(ufos.indexOf(ufo), 1);
       }
     }
-    
 
     checkCollisions();
   }
 
   composer.render(); // Gunakan composer untuk rendering
 }
-
 
 // Handle window resize
 window.addEventListener("resize", () => {

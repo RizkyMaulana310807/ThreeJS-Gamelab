@@ -1,0 +1,10 @@
+# Abaikan folder node_modules
+node_modules/
+
+# Abaikan file .env (jika berisi informasi sensitif)
+.env
+
+# Abaikan file & folder backup yang tidak diperlukan
+*.log
+.DS_Store
+Thumbs.db
